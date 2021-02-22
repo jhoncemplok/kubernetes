@@ -1,0 +1,4 @@
+git -log --decorate --online --graph  
+alias graph="command"
+
+delete git branch -d [name brand]
