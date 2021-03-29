@@ -1,0 +1,113 @@
+============== K8s Installation ===========
+----Cluster---
+---Kebutuhan Lab
+- Server 1 - Pod-master - 192.168.100.X
+- Server 2 - Pod-worker1 - 192.168.100.X
+- Server 2 - Pod-worker2 - 192.168.100.X
+
+---Persyaratan Lab
+- Minimal RAM 2 GB
+- 2 CPUs atau lebih
+- Koneksi internet stabil
+- Menggunakan hostname server unik/FQDN
+- Swap dinonaktifkan
+
+---Installasi dan konfig
+- Set hostname dan tambahkan baris pada /etc/hosts pada masing-masing server
+hostnamectl set-hostname pod-master // lakukan pada node master
+hostnamectl set-hostname pod-worker0 // lakukan pada node worker1
+hostnamectl set-hostname pod-worker1 // lakukan pada node worker2
+
+-Masukkan baris berikut pada masing-masing server /etc/hosts
+192.168.20.116   pod-master
+192.168.20.64    pod-worker1
+192.168.20.105   pod-worker2
+
+-Verifikasi dengan test ping menggunakan hostname
+ping pod-worker1 [/2] -> pod-master
+ping pod-master -> pod-worker1 [/2]
+
+-Install docker (Container Runtime) pada masing-masing node/server
+$sudo apt install apt-transport-https ca-certificates curl software-properties-common git
+$curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+$sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+$apt-get update && apt install docker-ce -y
+$cat > /etc/docker/daemon.json <<EOF
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}
+EOF
+
+$systemctl daemon-reload
+$systemctl enable docker.service
+$systemctl restart docker
+$systemctl status docker
+$docker --version
+
+$curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+$echo deb http://apt.kubernetes.io/ kubernetes-xenial main | sudo tee /etc/apt/sources.list.d/kubernetes.list
+$apt install kubelet kubeadm kubectl -y
+
+$sed -i '/ swap / s/^/#/' /etc/fstab
+$nano /etc/fstab             #disable yang ada swap nya
+$swapoff -a
+
+-Aktifkan IP Forwarding secara permanen. Edit file /etc/sysctl.conf
+net.ipv4.ip_forward=1
+$sysctl -p
+
+-Inisialisasi K8s di master
+sudo kubeadm init --pod-network-cidr=172.116.10.0/16 --apiserver-advertise-address=192.168.100.X
+Your Kubernetes control-plane has initialized successfully!
+To start using your cluster, you need to run the following as a regular user:
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run “kubectl apply -f [podnetwork].yaml” with one of the options listed at:
+https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.100.X:6443 --token aww805.9jktx4mtmzn9jl0k \ --discovery-token-ca-cert-hash sha256:[Token]
+
+[optional]
+jika menggunakan hanya 1 core maka tambahkan flag tersebut untuk mengantisipasinya
+kubeadm init --ignore-preflight-errors=NumCPU
+
+-Jalankan command tersebut pada node master
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+
+-inisialisasi untuk Container Networking Interface (CNI) -> master
+$sudo kubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml
+$sudo kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+-Menambahkan Worker pada Cluster -> worker1 [/2]
+$sudo kubeadm join 192.168.100.X:6443 --token aww805.9jktx4mtmzn9jl0k \
+--discovery-token-ca-cert-hash sha256:78bc6a8cbd08db783e408c74a21d4654245335cd9587827173dd7e27e37d3a87
+
+-Verifikasi Node Cluster
+$kubectl get nodes
+NAME            STATUS     ROLES                 AGE     VERSION
+pod-master    Ready   control-plane,master  27m     v1.20.1
+pod-worker1   Ready   <none>                8m3s    v1.20.1
+pod-worker2   NotReady   <none>                7m19s   v1.20.1
+
+NB : jika status belum ready, maka cek secara berkala
+
+-Verifikasi pod all-namespaces
+$kubectl get pods --all-namespaces
+(pastikan status running)
+
+---jika ingin menggunakan yang lain---
+1. https://v1-18.docs.kubernetes.io/docs/tasks/tools/install-minikube/
+
+2. https://ubuntu.com/kubernetes/install
