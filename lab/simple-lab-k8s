@@ -1,0 +1,193 @@
+####### Lab Simple #######
+************************************************************************************************************************************************************************
+----WebServer-----
+--nginx
+$kubectl create deployment nginx-web --image=nginx
+-verifikasi
+$kubectl get deploy
+$kubectl get deploy  -o wide
+$kubectl get pods
+(pastikan status running dan 1/1 ready)
+-scaleUP
+$kubectl scale --replicas=4 deployment nginx-web
+$kubectl get deploy (pastikan status di 1/1 berubah menjadi 4/4)
+-melihat detail dari pod
+$kubectl describe pod [namapod]
+
+--apache2
+$kubectl run http-web --image=httpd --port=80
+$kubectl get pods
+$kubectl expose pod http-web --name=http-service --port=80 --type=NodePort
+-cek service
+$kubectl describe svc http-service
+$kubectl get pods http-web -o wide
+Cek IP atau hostname yang digunakan pod “http-web” lalu silakan akses menggunakan curl via NodePort (32185)
+-hapus pod
+$kubectl delete pod (namapod)
+
+##### Membuat file YAML Deployment webserver.yaml #####
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: webserver
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: webserver
+    spec:
+      containers:
+      - name: webserver
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+
+##### Membuat deployment webserver #####
+kubectl create -f webserver.yaml
+kubectl get deployments
+kubectl get replicasets
+kubectl get pods
+
+
+##### Membuat file YAML Service ServiceType NodePort webserver-svc.yaml #####
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  labels:
+    run: web-service
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    protocol: TCP
+  selector:
+    app: webserver 
+
+##### Membuat service #####
+kubectl create -f webserver-svc.yaml
+kubectl get service
+kubectl describe svc web-service
+
+##### Test browsing IP master port maping service #####
+curl http://pod-master:[YYYYY]
+
+************************************************************************************************************************************************************************
+
+---Kubernets Volume---
+Referensi: https://github.com/kubernetes/examples/tree/master/staging/volumes/nfs
+
+##### Di node worker1, buat direktori /data #####
+sudo mkdir /data
+
+##### Unduh file manifest untuk deploy NFS server #####
+wget -c https://raw.githubusercontent.com/nolsatuid/labs/master/k9-adm/script/nfs-server.yaml
+vim nfs-server.yaml
+
+---
+    spec:
+      nodeSelector: 
+        kubernetes.io/hostname: node0
+
+ganti node0 dengan nama host worker1 [/2] (kubectl get nodes) masing-masing.
+
+##### Di node master, jalankan file nfs-server.yaml #####
+kubectl create -f nfs-server.yaml
+kubectl describe deployment nfs-server
+kubectl describe services nfs-server
+* Catat ClusterIP dari nfs-server
+
+##### PV Provisioning. Download nfs-pv.yaml dan edit IP server dengan ClusterIP nfs-server #####
+wget -c https://raw.githubusercontent.com/nolsatuid/labs/master/k9-adm/script/pv.yaml
+vim pv.yaml
+.....
+  nfs:
+    # FIXME: use the right IP
+    server: use IP from nfs-server ClusterIP
+path: "/exports"
+....
+
+kubectl create -f pv.yaml
+kubectl get pv
+
+##### PVC #####
+kubectl create -f https://raw.githubusercontent.com/nolsatuid/labs/master/k9-adm/script/pvc.yaml
+kubectl get pvc
+
+##### Instal paket nfs-common di semua node #####
+sudo apt install -y nfs-common
+
+##### Setup apps using pvc #####
+kubectl create -f https://raw.githubusercontent.com/nolsatuid/labs/master/k9-adm/script/nginx.yaml
+
+##### Buat service untuk nginx (nginx-svc.yaml) #####
+vim nginx-svc.yaml
+...
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-server
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    protocol: TCP
+  selector:
+    app: nginx
+...
+
+kubectl create -f nginx-svc.yaml
+
+##### tambahkan index.html di folder /data di worker1 #####
+sudo su
+echo "this is index file from (Yourname)" >> /data/index.html
+
+##### Testing #####
+curl http://pod-master:[XXXXX]
+
+
+https://ichi.pro/id/cara-menggunakan-nfs-di-kubernetes-cluster-metode-1-70855992996732
+
+************************************************************************************************************************************************************************
+
+
+---Kubernetes Dashboard---
+--install
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.3/aio/deploy/recommended.yaml
+-Tambahkan akun untuk manajemen dashboard
+kubectl create serviceaccount -n kubernetes-dashboard admin-user
+--RBAC
+$sudo nano rbac.yml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+-Eksekusi file RBAC
+$kubectl apply -f rbac.yml
+
+-Konfirmasi akun Token security
+kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk '{print $1}')
+(simpan token jangan sampai hilang)
+
+-edit service
+$kubectl -n kubeenetes-dashboard edit service kubernetes-dashboard 
+edit nodeport menjadi LoadBalancer
+(untuk melihat semua service bisa menggunakan "kubectl get all", "kubectl get all --namespace (namanamespace)")
+-verifikasi
+$kubectl -n kube-system get service kubernetes-dashboard
+
+-akses Dashboard
+ip:(portLB)
+(login dengan token yang sudah di dapat)
