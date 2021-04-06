@@ -19,9 +19,9 @@ hostnamectl set-hostname pod-worker0 // lakukan pada node worker1
 hostnamectl set-hostname pod-worker1 // lakukan pada node worker2
 
 -Masukkan baris berikut pada masing-masing server /etc/hosts
-192.168.20.116   pod-master
-192.168.20.64    pod-worker1
-192.168.20.105   pod-worker2
+192.168.100.116   pod-master
+192.168.100.64    pod-worker1
+192.168.100.105   pod-worker2
 
 -Verifikasi dengan test ping menggunakan hostname
 ping pod-worker1 [/2] -> pod-master
