@@ -156,11 +156,11 @@ https://ichi.pro/id/cara-menggunakan-nfs-di-kubernetes-cluster-metode-1-70855992
 
 ---Kubernetes Dashboard---
 --install
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.3/aio/deploy/recommended.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.2.0/aio/deploy/recommended.yaml
 -Tambahkan akun untuk manajemen dashboard
 kubectl create serviceaccount -n kubernetes-dashboard admin-user
 --RBAC
-$sudo nano rbac.yml
+$sudo nano rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -175,17 +175,19 @@ subjects:
   namespace: kubernetes-dashboard
 
 -Eksekusi file RBAC
-$kubectl apply -f rbac.yml
+$kubectl apply -f rbac.yaml
 
 -Konfirmasi akun Token security
 kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk '{print $1}')
 (simpan token jangan sampai hilang)
 
 -edit service
-$kubectl -n kubeenetes-dashboard edit service kubernetes-dashboard 
-edit nodeport menjadi LoadBalancer
-(untuk melihat semua service bisa menggunakan "kubectl get all", "kubectl get all --namespace (namanamespace)")
+$kubectl -n kubernetes-dashboard edit service kubernetes-dashboard 
+edit ClusterIP menjadi LoadBalancer
+
 -verifikasi
+(untuk melihat semua service bisa menggunakan "kubectl get all", "kubectl get all --namespace (namanamespace)")
+
 $kubectl -n kubernetes-dashboard get service kubernetes-dashboard
 
 -akses Dashboard
