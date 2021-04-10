@@ -186,7 +186,7 @@ $kubectl -n kubeenetes-dashboard edit service kubernetes-dashboard
 edit nodeport menjadi LoadBalancer
 (untuk melihat semua service bisa menggunakan "kubectl get all", "kubectl get all --namespace (namanamespace)")
 -verifikasi
-$kubectl -n kube-system get service kubernetes-dashboard
+$kubectl -n kubernetes-dashboard get service kubernetes-dashboard
 
 -akses Dashboard
 ip:(portLB)
